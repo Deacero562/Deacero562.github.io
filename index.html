@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SimpleSwap Frontend</title>
+</head>
+<body>
+  <h1>SimpleSwap Interface</h1>
+  <p>Conectá tu wallet y realizá un swap de tokens.</p>
+
+  <button onclick="connectWallet()">Conectar Wallet</button>
+
+  <script>
+    async function connectWallet() {
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        alert('Wallet conectada: ' + accounts[0]);
+      } else {
+        alert('Metamask no detectado');
+      }
+    }
+  </script>
+</body>
+</html>
