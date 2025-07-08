@@ -8,7 +8,7 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
     label { display: block; margin-top: 1rem; }
-    input[type=text], input[type=number] { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    input[type=text], input[type=number], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
     button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
     #status { margin-top: 1rem; font-weight: bold; }
   </style>
@@ -26,12 +26,19 @@
   </div>
 
   <div>
-    <label>Amount In (Token A):
-      <input type="number" id="amountIn" min="0" step="any" placeholder="Amount of Token A to swap" />
+    <label>Swap direction:
+      <select id="swapDirection">
+        <option value="AtoB">Token A → Token B</option>
+        <option value="BtoA">Token B → Token A</option>
+      </select>
     </label>
 
-    <label>Minimum Amount Out (Token B):
-      <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount of Token B to receive" />
+    <label>Amount In:
+      <input type="number" id="amountIn" min="0" step="any" placeholder="Amount to swap" />
+    </label>
+
+    <label>Minimum Amount Out:
+      <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount to receive" />
     </label>
 
     <label>Deadline (unix timestamp):
@@ -39,7 +46,7 @@
     </label>
 
     <label>Recipient address:
-      <input type="text" id="recipient" placeholder="Address to receive Token B" />
+      <input type="text" id="recipient" placeholder="Address to receive tokens" />
     </label>
 
     <button id="connectBtn">Connect Wallet</button>
@@ -49,7 +56,6 @@
   </div>
 
   <script>
-    // === SET HERE YOUR DEPLOYED CONTRACTS ===
     const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc";
     const TOKEN_A_ADDRESS = "0x694C824819eF1f34EE04f591d1f2a2DABB89590E";
     const TOKEN_B_ADDRESS = "0x0f1b9B2B99F58Fd9cf0Adf729863844812F2401C";
@@ -57,13 +63,11 @@
     document.getElementById("tokenA").value = TOKEN_A_ADDRESS;
     document.getElementById("tokenB").value = TOKEN_B_ADDRESS;
 
-    // Minimal ABI fragments for interacting with contracts
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
       "function allowance(address owner, address spender) external view returns (uint256)",
       "function decimals() view returns (uint8)",
-      "function balanceOf(address) view returns (uint256)",
-      "event Approval(address indexed owner, address indexed spender, uint256 value)"
+      "function balanceOf(address) view returns (uint256)"
     ];
 
     const simpleSwapAbi = [
@@ -102,21 +106,46 @@
         const amountOutMinInput = document.getElementById("amountOutMin").value;
         const deadlineInput = document.getElementById("deadline").value;
         const recipient = document.getElementById("recipient").value;
+        const swapDirection = document.getElementById("swapDirection").value;
 
         if (!amountInInput || !amountOutMinInput || !deadlineInput || !recipient) {
           alert("Please fill all fields.");
           return;
         }
 
-        const amountIn = ethers.utils.parseUnits(amountInInput, 18);
-        const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, 18);
+        const amountInRaw = parseFloat(amountInInput);
+        const amountOutMinRaw = parseFloat(amountOutMinInput);
         const deadline = Number(deadlineInput);
 
+        // Determine token contracts based on direction
+        let tokenInContract, tokenOutContract;
+        let tokenInAddress, tokenOutAddress;
+
+        if (swapDirection === "AtoB") {
+          tokenInContract = tokenAContract;
+          tokenOutContract = tokenBContract;
+          tokenInAddress = TOKEN_A_ADDRESS;
+          tokenOutAddress = TOKEN_B_ADDRESS;
+        } else {
+          tokenInContract = tokenBContract;
+          tokenOutContract = tokenAContract;
+          tokenInAddress = TOKEN_B_ADDRESS;
+          tokenOutAddress = TOKEN_A_ADDRESS;
+        }
+
+        // Get decimals for tokenIn and tokenOut
+        const decimalsIn = await tokenInContract.decimals();
+        const decimalsOut = await tokenOutContract.decimals();
+
+        // Convert input amounts using decimals
+        const amountIn = ethers.utils.parseUnits(amountInRaw.toString(), decimalsIn);
+        const amountOutMin = ethers.utils.parseUnits(amountOutMinRaw.toString(), decimalsOut);
+
         // Check allowance and approve if needed
-        const allowance = await tokenAContract.allowance(await signer.getAddress(), SIMPLE_SWAP_ADDRESS);
+        const allowance = await tokenInContract.allowance(await signer.getAddress(), SIMPLE_SWAP_ADDRESS);
         if (allowance.lt(amountIn)) {
-          document.getElementById("status").innerText = "Approving Token A...";
-          const approveTx = await tokenAContract.approve(SIMPLE_SWAP_ADDRESS, amountIn);
+          document.getElementById("status").innerText = "Approving token for swap...";
+          const approveTx = await tokenInContract.approve(SIMPLE_SWAP_ADDRESS, amountIn);
           await approveTx.wait();
         }
 
@@ -124,7 +153,7 @@
         const tx = await simpleSwapContract.swapExactTokensForTokens(
           amountIn,
           amountOutMin,
-          [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS],
+          [tokenInAddress, tokenOutAddress],
           recipient,
           deadline
         );
@@ -135,6 +164,18 @@
         document.getElementById("status").innerText = "Swap failed: " + (error.data?.message || error.message);
       }
     }
+
+    // Update the placeholder of "Amount In" input when swap direction changes
+    document.getElementById("swapDirection").addEventListener("change", () => {
+      const dir = document.getElementById("swapDirection").value;
+      if (dir === "AtoB") {
+        document.getElementById("amountIn").placeholder = "Amount of Token A to swap";
+        document.getElementById("amountOutMin").placeholder = "Minimum amount of Token B to receive";
+      } else {
+        document.getElementById("amountIn").placeholder = "Amount of Token B to swap";
+        document.getElementById("amountOutMin").placeholder = "Minimum amount of Token A to receive";
+      }
+    });
 
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
