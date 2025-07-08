@@ -1,22 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>SimpleSwap Frontend</title>
+  <meta charset="UTF-8" />
+  <title>SimpleSwap DApp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
-  <h1>SimpleSwap Interface</h1>
-  <p>Conectá tu wallet y realizá un swap de tokens.</p>
+  <h1>SimpleSwap Frontend</h1>
 
-  <button onclick="connectWallet()">Conectar Wallet</button>
+  <button onclick="connect()">Connect Wallet</button>
+
+  <h2>Get Price</h2>
+  <input id="tokenA" placeholder="Token A Address">
+  <input id="tokenB" placeholder="Token B Address">
+  <button onclick="getPrice()">Get Price</button>
+  <p id="priceOutput"></p>
+
+  <h2>Swap Exact Tokens</h2>
+  <input id="amountIn" placeholder="Amount In">
+  <input id="minOut" placeholder="Min Amount Out">
+  <input id="path0" placeholder="Token A">
+  <input id="path1" placeholder="Token B">
+  <input id="to" placeholder="Recipient Address">
+  <button onclick="swap()">Swap</button>
+  <p id="swapStatus"></p>
 
   <script>
-    async function connectWallet() {
+    const CONTRACT_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc"; // 
+
+    const ABI = [
+      "function getPrice(address tokenA, address tokenB) external view returns (uint256)",
+      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory)"
+    ];
+
+    let provider, signer, contract;
+
+    async function connect() {
       if (window.ethereum) {
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        alert('Wallet conectada: ' + accounts[0]);
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        alert("Wallet connected");
       } else {
-        alert('Metamask no detectado');
+        alert("Please install Metamask");
+      }
+    }
+
+    async function getPrice() {
+      const tokenA = document.getElementById("tokenA").value;
+      const tokenB = document.getElementById("tokenB").value;
+      const price = await contract.getPrice(tokenA, tokenB);
+      document.getElementById("priceOutput").innerText = `Price: ${ethers.utils.formatUnits(price, 18)}`;
+    }
+
+    async function swap() {
+      const amountIn = ethers.utils.parseUnits(document.getElementById("amountIn").value, 18);
+      const minOut = ethers.utils.parseUnits(document.getElementById("minOut").value, 18);
+      const path = [document.getElementById("path0").value, document.getElementById("path1").value];
+      const to = document.getElementById("to").value;
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
+
+      try {
+        const tx = await contract.swapExactTokensForTokens(amountIn, minOut, path, to, deadline);
+        await tx.wait();
+        document.getElementById("swapStatus").innerText = "Swap successful!";
+      } catch (err) {
+        console.error(err);
+        document.getElementById("swapStatus").innerText = "Swap failed.";
       }
     }
   </script>
