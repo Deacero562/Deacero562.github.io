@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SimpleSwap DEX - Checksum fixed</title>
+  <title>SimpleSwap DEX - Checksum fixed + Get Price</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
@@ -40,19 +40,19 @@
     <button id="approveBtn" disabled>Approve Tokens</button>
     <button id="addLiquidityBtn" disabled>Add Liquidity</button>
     <button id="swapBtn" disabled>Swap Tokens</button>
+    <button id="getPriceBtn" disabled>Get Price</button>
 
     <div id="status"></div>
+    <div id="priceDisplay" style="margin-top: 1rem; font-weight: bold;"></div>
   </div>
 
   <script>
     const { ethers } = window;
 
-    // Raw lowercase addresses (no checksum)
     const SIMPLE_SWAP_ADDRESS_RAW = "0x344ec156133a57169cb50d8f2a67f9e9023698fc";
     const TOKEN_A_ADDRESS_RAW = "0xa37d029de7c770ef8de20fb1225167f84ae9dec8";
     const TOKEN_B_ADDRESS_RAW = "0x788839617211f1056ef48c3b425a102e804a5a36";
 
-    // Force checksum addresses
     const SIMPLE_SWAP_ADDRESS = ethers.utils.getAddress(SIMPLE_SWAP_ADDRESS_RAW);
     const TOKEN_A_ADDRESS = ethers.utils.getAddress(TOKEN_A_ADDRESS_RAW);
     const TOKEN_B_ADDRESS = ethers.utils.getAddress(TOKEN_B_ADDRESS_RAW);
@@ -66,7 +66,8 @@
 
     const simpleSwapAbi = [
       "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256, uint256, uint256)",
-      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)"
+      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+      "function getPrice(address tokenA, address tokenB) external view returns (uint256)"
     ];
 
     let provider, signer;
@@ -90,6 +91,7 @@
         document.getElementById("approveBtn").disabled = false;
         document.getElementById("addLiquidityBtn").disabled = false;
         document.getElementById("swapBtn").disabled = false;
+        document.getElementById("getPriceBtn").disabled = false;
       } catch (error) {
         console.error(error);
         document.getElementById("status").innerText = "Failed to connect wallet.";
@@ -198,10 +200,32 @@
       }
     }
 
+    async function getPrice() {
+      try {
+        const direction = document.getElementById("swapDirection").value;
+        const tokenIn = direction === "AtoB" ? TOKEN_A_ADDRESS : TOKEN_B_ADDRESS;
+        const tokenOut = direction === "AtoB" ? TOKEN_B_ADDRESS : TOKEN_A_ADDRESS;
+
+        document.getElementById("status").innerText = "Fetching price...";
+        const priceRaw = await simpleSwapContract.getPrice(tokenIn, tokenOut);
+        // priceRaw is uint256 with 18 decimals
+
+        // Convert price to human-readable number (floating point)
+        const priceFormatted = ethers.utils.formatUnits(priceRaw, 18);
+
+        document.getElementById("priceDisplay").innerText = `Price: 1 ${direction === "AtoB" ? "Token A" : "Token B"} = ${priceFormatted} ${direction === "AtoB" ? "Token B" : "Token A"}`;
+        document.getElementById("status").innerText = "";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Get price failed: " + (error.data?.message || error.message);
+      }
+    }
+
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
     document.getElementById("approveBtn").addEventListener("click", approveTokens);
     document.getElementById("addLiquidityBtn").addEventListener("click", addLiquidity);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
+    document.getElementById("getPriceBtn").addEventListener("click", getPrice);
   </script>
 </body>
 </html>
