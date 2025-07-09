@@ -3,94 +3,89 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Agregar Liquidez SimpleSwap</title>
+<title>Conectar Wallet y Agregar Liquidez</title>
 <script src="https://cdn.ethers.io/lib/ethers-5.6.umd.min.js" type="application/javascript"></script>
-<style>
-  body { font-family: Arial, sans-serif; padding: 1rem; }
-  #walletAddress { margin-top: 0.5rem; font-weight: bold; }
-  button { margin: 0.5rem 0; padding: 0.5rem 1rem; font-size: 1rem; }
-</style>
 </head>
 <body>
 
-<h2>Agregar Liquidez</h2>
-
 <button id="btnConnect">Conectar Wallet</button>
-<div id="walletAddress">No conectado</div>
+<p id="status">No conectado</p>
 
-<button id="btnAddLiquidity" disabled>Aprobar y Agregar Liquidez</button>
+<hr />
+
+<h3>Agregar Liquidez</h3>
+<button id="btnAddLiquidity" disabled>Agregar Liquidez</button>
+<p id="result"></p>
 
 <script>
-  // Configurá estas variables:
-  const CONTRACT_ADDRESS = "0x344ec156133a57169cb50d8f2a67f9e9023698fc"; // SimpleUniswapRouter
-  const TOKEN_A = "0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8"; // Token A
-  const TOKEN_B = "0x788839617211f1056Ef48C3B425A102E804A5A36"; // Token B
+  const btnConnect = document.getElementById('btnConnect');
+  const btnAddLiquidity = document.getElementById('btnAddLiquidity');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
 
-  // Montos deseados para agregar liquidez (en wei, 18 decimales)
-  const amountADesired = ethers.utils.parseEther("10"); // 10 tokens
-  const amountBDesired = ethers.utils.parseEther("10");
+  let provider;
+  let signer;
+  let userAddress;
 
-  // Montos mínimos (para slippage)
-  const amountAMin = ethers.utils.parseEther("9.9");
-  const amountBMin = ethers.utils.parseEther("9.9");
+  // Dirección del contrato SimpleUniswapRouter desplegado
+  const contractAddress = '0x344ec156133a57169cb50d8f2a67f9e9023698fc';
 
-  let userAddress = null;
-  let signer, provider;
-
-  const tokenABI = [
-    "function approve(address spender, uint256 amount) external returns (bool)",
+  // ABI reducido para addLiquidity (modifica si tu contrato tiene más funciones o diferente ABI)
+  const contractABI = [
+    "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256,uint256,uint256)"
   ];
 
-  const routerABI = [
-    "function addLiquidity(address tokenA,address tokenB,uint256 amountADesired,uint256 amountBDesired,uint256 amountAMin,uint256 amountBMin,address to,uint256 deadline) external returns (uint256,uint256,uint256)",
-  ];
+  // Parámetros para addLiquidity: cámbialos según tu caso
+  const tokenA = '0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8';
+  const tokenB = '0x788839617211f1056Ef48C3B425A102E804A5A36';
 
-  async function connectWallet() {
+  // Ejemplo cantidades (18 decimales)
+  const amountADesired = ethers.utils.parseUnits("10", 18); // 10 tokens A
+  const amountBDesired = ethers.utils.parseUnits("10", 18); // 10 tokens B
+
+  // Slippage mínimo (ejemplo 99% de la cantidad deseada)
+  const amountAMin = ethers.utils.parseUnits("9.9", 18);
+  const amountBMin = ethers.utils.parseUnits("9.9", 18);
+
+  // Deadline: ahora + 20 minutos
+  const deadline = Math.floor(Date.now() / 1000) + 1200;
+
+  btnConnect.addEventListener('click', async () => {
     if (!window.ethereum) {
-      alert("Por favor, instalá MetaMask para usar esta app.");
+      alert('MetaMask no está instalado');
       return;
     }
     try {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
       provider = new ethers.providers.Web3Provider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
       signer = provider.getSigner();
       userAddress = await signer.getAddress();
-      document.getElementById("walletAddress").textContent = `Wallet conectada: ${userAddress}`;
-      document.getElementById("btnAddLiquidity").disabled = false;
-      document.getElementById("btnConnect").disabled = true;
+      status.textContent = `Wallet conectada: ${userAddress}`;
+      btnConnect.disabled = true;
+      btnAddLiquidity.disabled = false;
+      console.log("Wallet conectada:", userAddress);
     } catch (error) {
-      alert("Error al conectar la wallet");
-      console.error(error);
+      console.error('Error al conectar wallet:', error);
+      status.textContent = 'Error al conectar wallet';
     }
-  }
+  });
 
-  async function approveToken(tokenContract, amount, tokenName) {
-    const tx = await tokenContract.approve(CONTRACT_ADDRESS, amount);
-    await tx.wait();
-    console.log(`Aprobado ${ethers.utils.formatEther(amount)} ${tokenName}`);
-  }
-
-  async function addLiquidity() {
-    if (!signer || !userAddress) {
-      alert("Primero conectá la wallet");
+  btnAddLiquidity.addEventListener('click', async () => {
+    if (!signer) {
+      alert('Primero conecta tu wallet');
       return;
     }
-    const tokenAContract = new ethers.Contract(TOKEN_A, tokenABI, signer);
-    const tokenBContract = new ethers.Contract(TOKEN_B, tokenABI, signer);
-    const routerContract = new ethers.Contract(CONTRACT_ADDRESS, routerABI, signer);
 
     try {
-      // Approve Token A
-      await approveToken(tokenAContract, amountADesired, "Token A");
-      // Approve Token B
-      await approveToken(tokenBContract, amountBDesired, "Token B");
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
 
-      // Deadline 20 min en el futuro
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+      // IMPORTANTE: Antes de llamar addLiquidity, debes asegurarte que tu wallet haya aprobado (approve) al contrato
+      // para gastar los tokens tokenA y tokenB. Si no, la transacción fallará con "allowance exceeded".
+      // Esa parte la debes hacer antes o añadirla aquí.
 
-      const tx = await routerContract.addLiquidity(
-        TOKEN_A,
-        TOKEN_B,
+      const tx = await contract.addLiquidity(
+        tokenA,
+        tokenB,
         amountADesired,
         amountBDesired,
         amountAMin,
@@ -98,18 +93,18 @@
         userAddress,
         deadline
       );
-      console.log("Transacción enviada, esperando confirmación...");
-      await tx.wait();
-      alert("¡Liquidez agregada exitosamente!");
+
+      result.textContent = 'Transacción enviada, esperando confirmación...';
+      console.log('Tx hash:', tx.hash);
+
+      const receipt = await tx.wait();
+      result.textContent = `Liquidez agregada! Tx hash: ${receipt.transactionHash}`;
+      console.log('Tx receipt:', receipt);
     } catch (error) {
-      console.error("Error al agregar liquidez:", error);
-      alert("Error al agregar liquidez. Revisá la consola.");
+      console.error('Error al agregar liquidez:', error);
+      result.textContent = 'Error al agregar liquidez: ' + (error.data?.message || error.message || error);
     }
-  }
-
-  document.getElementById("btnConnect").onclick = connectWallet;
-  document.getElementById("btnAddLiquidity").onclick = addLiquidity;
-
+  });
 </script>
 
 </body>
