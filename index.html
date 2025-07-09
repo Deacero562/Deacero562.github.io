@@ -4,14 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SimpleSwap DEX</title>
-
-  <!-- ✅ Cargar ethers.js desde CDN compatible con navegador -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
     label { display: block; margin-top: 1rem; }
-    input[type=text], input[type=number], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    input, select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
     button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
     #status { margin-top: 1rem; font-weight: bold; }
   </style>
@@ -20,33 +17,19 @@
   <h1>SimpleSwap DEX - Sepolia</h1>
 
   <div>
-    <label>Swap direction:
+    <label>Swap Direction:
       <select id="swapDirection">
         <option value="AtoB">Token A → Token B</option>
         <option value="BtoA">Token B → Token A</option>
       </select>
     </label>
 
-    <label>Token A address:
-      <input type="text" id="tokenA" readonly />
-    </label>
-
-    <label>Token B address:
-      <input type="text" id="tokenB" readonly />
-    </label>
-  </div>
-
-  <div>
     <label>Amount In:
       <input type="number" id="amountIn" min="0" step="any" placeholder="Amount to swap" />
     </label>
 
     <label>Minimum Amount Out:
       <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount to receive" />
-    </label>
-
-    <label>Deadline (unix timestamp):
-      <input type="number" id="deadline" min="0" placeholder="Deadline timestamp" />
     </label>
 
     <label>Recipient address:
@@ -60,13 +43,9 @@
   </div>
 
   <script>
-    // === ✅ TU CONFIGURACIÓN DE CONTRATOS EN SEPOLIA ===
     const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc";
     const TOKEN_A_ADDRESS = "0x694C824819eF1f34EE04f591d1f2a2DABB89590E";
     const TOKEN_B_ADDRESS = "0x0f1b9B2B99F58Fd9cf0Adf729863844812F2401C";
-
-    document.getElementById("tokenA").value = TOKEN_A_ADDRESS;
-    document.getElementById("tokenB").value = TOKEN_B_ADDRESS;
 
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
@@ -76,8 +55,7 @@
     ];
 
     const simpleSwapAbi = [
-      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
-      "function getPrice(address tokenA, address tokenB) external view returns (uint256)"
+      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)"
     ];
 
     let provider, signer;
@@ -97,11 +75,11 @@
         tokenAContract = new ethers.Contract(TOKEN_A_ADDRESS, erc20Abi, signer);
         tokenBContract = new ethers.Contract(TOKEN_B_ADDRESS, erc20Abi, signer);
 
-        document.getElementById("status").innerText = "✅ Wallet connected!";
+        document.getElementById("status").innerText = "Wallet connected!";
         document.getElementById("swapBtn").disabled = false;
       } catch (error) {
         console.error(error);
-        document.getElementById("status").innerText = "❌ Failed to connect wallet.";
+        document.getElementById("status").innerText = "Failed to connect wallet.";
       }
     }
 
@@ -109,27 +87,28 @@
       try {
         const amountInInput = document.getElementById("amountIn").value;
         const amountOutMinInput = document.getElementById("amountOutMin").value;
-        const deadlineInput = document.getElementById("deadline").value;
         const recipient = document.getElementById("recipient").value;
         const direction = document.getElementById("swapDirection").value;
 
-        if (!amountInInput || !amountOutMinInput || !deadlineInput || !recipient) {
+        if (!amountInInput || !amountOutMinInput || !recipient) {
           alert("Please fill all fields.");
           return;
         }
 
         const amountIn = ethers.utils.parseUnits(amountInInput, 18);
         const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, 18);
-        const deadline = Number(deadlineInput);
+        const deadline = Math.floor(Date.now() / 1000) + 300; // +5 min
 
-        const [tokenIn, tokenOut, tokenInContract] = direction === "AtoB"
-          ? [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS, tokenAContract]
-          : [TOKEN_B_ADDRESS, TOKEN_A_ADDRESS, tokenBContract];
+        const path = direction === "AtoB"
+          ? [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS]
+          : [TOKEN_B_ADDRESS, TOKEN_A_ADDRESS];
 
-        const allowance = await tokenInContract.allowance(await signer.getAddress(), SIMPLE_SWAP_ADDRESS);
+        const inputToken = direction === "AtoB" ? tokenAContract : tokenBContract;
+
+        const allowance = await inputToken.allowance(await signer.getAddress(), SIMPLE_SWAP_ADDRESS);
         if (allowance.lt(amountIn)) {
           document.getElementById("status").innerText = "Approving token...";
-          const approveTx = await tokenInContract.approve(SIMPLE_SWAP_ADDRESS, amountIn);
+          const approveTx = await inputToken.approve(SIMPLE_SWAP_ADDRESS, amountIn);
           await approveTx.wait();
         }
 
@@ -137,16 +116,15 @@
         const tx = await simpleSwapContract.swapExactTokensForTokens(
           amountIn,
           amountOutMin,
-          [tokenIn, tokenOut],
+          path,
           recipient,
           deadline
         );
         await tx.wait();
-
-        document.getElementById("status").innerText = "✅ Swap completed successfully!";
+        document.getElementById("status").innerText = "Swap completed successfully!";
       } catch (error) {
         console.error(error);
-        document.getElementById("status").innerText = "❌ Swap failed: " + (error.data?.message || error.message);
+        document.getElementById("status").innerText = "Swap failed: " + (error.data?.message || error.message);
       }
     }
 
