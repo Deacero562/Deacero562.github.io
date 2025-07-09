@@ -37,15 +37,16 @@
     </label>
 
     <button id="connectBtn">Connect Wallet</button>
+    <button id="addLiquidityBtn" disabled>Add Liquidity (10M tokens each)</button>
     <button id="swapBtn" disabled>Swap Tokens</button>
 
     <div id="status"></div>
   </div>
 
   <script>
-    const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc";
-    const TOKEN_A_ADDRESS = "0x694C824819eF1f34EE04f591d1f2a2DABB89590E";
-    const TOKEN_B_ADDRESS = "0x0f1b9B2B99F58Fd9cf0Adf729863844812F2401C";
+    const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2a67f9e9023698fc";
+    const TOKEN_A_ADDRESS = "0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8";
+    const TOKEN_B_ADDRESS = "0x788839617211f1056Ef48C3B425A102E804A5A36";
 
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
@@ -55,7 +56,8 @@
     ];
 
     const simpleSwapAbi = [
-      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)"
+      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+      "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 amountA, uint256 amountB, uint256 liquidity)"
     ];
 
     let provider, signer;
@@ -77,9 +79,54 @@
 
         document.getElementById("status").innerText = "Wallet connected!";
         document.getElementById("swapBtn").disabled = false;
+        document.getElementById("addLiquidityBtn").disabled = false;
       } catch (error) {
         console.error(error);
         document.getElementById("status").innerText = "Failed to connect wallet.";
+      }
+    }
+
+    async function addLiquidity() {
+      try {
+        const amountADesired = ethers.utils.parseUnits("10000000", 18); // 10 million tokens
+        const amountBDesired = ethers.utils.parseUnits("10000000", 18);
+        const amountAMin = amountADesired.mul(99).div(100); // 1% slippage
+        const amountBMin = amountBDesired.mul(99).div(100);
+        const to = await signer.getAddress();
+        const deadline = Math.floor(Date.now() / 1000) + 600; // +10 minutes
+
+        // Approve token A if needed
+        const allowanceA = await tokenAContract.allowance(to, SIMPLE_SWAP_ADDRESS);
+        if (allowanceA.lt(amountADesired)) {
+          document.getElementById("status").innerText = "Approving Token A...";
+          const txA = await tokenAContract.approve(SIMPLE_SWAP_ADDRESS, amountADesired);
+          await txA.wait();
+        }
+
+        // Approve token B if needed
+        const allowanceB = await tokenBContract.allowance(to, SIMPLE_SWAP_ADDRESS);
+        if (allowanceB.lt(amountBDesired)) {
+          document.getElementById("status").innerText = "Approving Token B...";
+          const txB = await tokenBContract.approve(SIMPLE_SWAP_ADDRESS, amountBDesired);
+          await txB.wait();
+        }
+
+        document.getElementById("status").innerText = "Adding liquidity...";
+        const tx = await simpleSwapContract.addLiquidity(
+          TOKEN_A_ADDRESS,
+          TOKEN_B_ADDRESS,
+          amountADesired,
+          amountBDesired,
+          amountAMin,
+          amountBMin,
+          to,
+          deadline
+        );
+        await tx.wait();
+        document.getElementById("status").innerText = "Liquidity added successfully!";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Add liquidity failed: " + (error.data?.message || error.message);
       }
     }
 
@@ -97,7 +144,7 @@
 
         const amountIn = ethers.utils.parseUnits(amountInInput, 18);
         const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, 18);
-        const deadline = Math.floor(Date.now() / 1000) + 300; // +5 min
+        const deadline = Math.floor(Date.now() / 1000) + 300; // +5 minutes
 
         const path = direction === "AtoB"
           ? [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS]
@@ -129,6 +176,7 @@
     }
 
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
+    document.getElementById("addLiquidityBtn").addEventListener("click", addLiquidity);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
   </script>
 </body>
