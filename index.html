@@ -4,11 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SimpleSwap DEX</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+
+  <!-- 🔧 Carga correcta de ethers.js -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
     label { display: block; margin-top: 1rem; }
-    input[type=text], input[type=number], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    input[type=text], input[type=number] { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
     button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
     #status { margin-top: 1rem; font-weight: bold; }
   </style>
