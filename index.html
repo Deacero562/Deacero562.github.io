@@ -1,79 +1,116 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Auto Add Liquidity</title>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Agregar Liquidez SimpleSwap</title>
+<script src="https://cdn.ethers.io/lib/ethers-5.6.umd.min.js" type="application/javascript"></script>
+<style>
+  body { font-family: Arial, sans-serif; padding: 1rem; }
+  #walletAddress { margin-top: 0.5rem; font-weight: bold; }
+  button { margin: 0.5rem 0; padding: 0.5rem 1rem; font-size: 1rem; }
+</style>
 </head>
 <body>
-  <button onclick="addLiquidity()">Agregar Liquidez</button>
 
-  <script>
-    const CONTRACT_ADDRESS = "0x344ec156133a57169cb50d8f2a67f9e9023698fc";
-    const ABI = [ // Solo la parte necesaria del ABI
-      {
-        "inputs": [
-          { "internalType": "address", "name": "tokenA", "type": "address" },
-          { "internalType": "address", "name": "tokenB", "type": "address" },
-          { "internalType": "uint256", "name": "amountADesired", "type": "uint256" },
-          { "internalType": "uint256", "name": "amountBDesired", "type": "uint256" },
-          { "internalType": "uint256", "name": "amountAMin", "type": "uint256" },
-          { "internalType": "uint256", "name": "amountBMin", "type": "uint256" },
-          { "internalType": "address", "name": "to", "type": "address" },
-          { "internalType": "uint256", "name": "deadline", "type": "uint256" }
-        ],
-        "name": "addLiquidity",
-        "outputs": [
-          { "internalType": "uint256", "name": "amountA", "type": "uint256" },
-          { "internalType": "uint256", "name": "amountB", "type": "uint256" },
-          { "internalType": "uint256", "name": "liquidity", "type": "uint256" }
-        ],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      }
-    ];
+<h2>Agregar Liquidez</h2>
 
-    const tokenA = "0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8";
-    const tokenB = "0x788839617211f1056Ef48C3B425A102E804A5A36";
+<button id="btnConnect">Conectar Wallet</button>
+<div id="walletAddress">No conectado</div>
 
-    const amountADesired = ethers.utils.parseUnits("10000000", 18);
-    const amountBDesired = ethers.utils.parseUnits("10000000", 18);
-    const amountAMin = ethers.utils.parseUnits("9900000", 18);
-    const amountBMin = ethers.utils.parseUnits("9900000", 18);
+<button id="btnAddLiquidity" disabled>Aprobar y Agregar Liquidez</button>
 
-    async function addLiquidity() {
-      if (!window.ethereum) {
-        alert("Instalá MetaMask primero.");
-        return;
-      }
+<script>
+  // Configurá estas variables:
+  const CONTRACT_ADDRESS = "0x344ec156133a57169cb50d8f2a67f9e9023698fc"; // SimpleUniswapRouter
+  const TOKEN_A = "0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8"; // Token A
+  const TOKEN_B = "0x788839617211f1056Ef48C3B425A102E804A5A36"; // Token B
 
-      await ethereum.request({ method: 'eth_requestAccounts' });
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const address = await signer.getAddress();
+  // Montos deseados para agregar liquidez (en wei, 18 decimales)
+  const amountADesired = ethers.utils.parseEther("10"); // 10 tokens
+  const amountBDesired = ethers.utils.parseEther("10");
 
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+  // Montos mínimos (para slippage)
+  const amountAMin = ethers.utils.parseEther("9.9");
+  const amountBMin = ethers.utils.parseEther("9.9");
 
-      const deadline = Math.floor(Date.now() / 1000) + 1800; // 30 minutos desde ahora
+  let userAddress = null;
+  let signer, provider;
 
-      try {
-        const tx = await contract.addLiquidity(
-          tokenA,
-          tokenB,
-          amountADesired,
-          amountBDesired,
-          amountAMin,
-          amountBMin,
-          address,
-          deadline
-        );
-        await tx.wait();
-        alert("Liquidez agregada exitosamente.");
-      } catch (err) {
-        console.error("Error al agregar liquidez:", err);
-        alert("Error al agregar liquidez. Revisá la consola.");
-      }
+  const tokenABI = [
+    "function approve(address spender, uint256 amount) external returns (bool)",
+  ];
+
+  const routerABI = [
+    "function addLiquidity(address tokenA,address tokenB,uint256 amountADesired,uint256 amountBDesired,uint256 amountAMin,uint256 amountBMin,address to,uint256 deadline) external returns (uint256,uint256,uint256)",
+  ];
+
+  async function connectWallet() {
+    if (!window.ethereum) {
+      alert("Por favor, instalá MetaMask para usar esta app.");
+      return;
     }
-  </script>
+    try {
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      userAddress = await signer.getAddress();
+      document.getElementById("walletAddress").textContent = `Wallet conectada: ${userAddress}`;
+      document.getElementById("btnAddLiquidity").disabled = false;
+      document.getElementById("btnConnect").disabled = true;
+    } catch (error) {
+      alert("Error al conectar la wallet");
+      console.error(error);
+    }
+  }
+
+  async function approveToken(tokenContract, amount, tokenName) {
+    const tx = await tokenContract.approve(CONTRACT_ADDRESS, amount);
+    await tx.wait();
+    console.log(`Aprobado ${ethers.utils.formatEther(amount)} ${tokenName}`);
+  }
+
+  async function addLiquidity() {
+    if (!signer || !userAddress) {
+      alert("Primero conectá la wallet");
+      return;
+    }
+    const tokenAContract = new ethers.Contract(TOKEN_A, tokenABI, signer);
+    const tokenBContract = new ethers.Contract(TOKEN_B, tokenABI, signer);
+    const routerContract = new ethers.Contract(CONTRACT_ADDRESS, routerABI, signer);
+
+    try {
+      // Approve Token A
+      await approveToken(tokenAContract, amountADesired, "Token A");
+      // Approve Token B
+      await approveToken(tokenBContract, amountBDesired, "Token B");
+
+      // Deadline 20 min en el futuro
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+
+      const tx = await routerContract.addLiquidity(
+        TOKEN_A,
+        TOKEN_B,
+        amountADesired,
+        amountBDesired,
+        amountAMin,
+        amountBMin,
+        userAddress,
+        deadline
+      );
+      console.log("Transacción enviada, esperando confirmación...");
+      await tx.wait();
+      alert("¡Liquidez agregada exitosamente!");
+    } catch (error) {
+      console.error("Error al agregar liquidez:", error);
+      alert("Error al agregar liquidez. Revisá la consola.");
+    }
+  }
+
+  document.getElementById("btnConnect").onclick = connectWallet;
+  document.getElementById("btnAddLiquidity").onclick = addLiquidity;
+
+</script>
+
 </body>
 </html>
