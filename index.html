@@ -5,28 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SimpleSwap DEX</title>
 
-  <!-- 🔧 Carga correcta de ethers.js -->
+  <!-- ✅ Cargar ethers.js desde CDN compatible con navegador -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
     label { display: block; margin-top: 1rem; }
-    input[type=text], input[type=number] { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    input[type=text], input[type=number], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
     button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
     #status { margin-top: 1rem; font-weight: bold; }
   </style>
 </head>
 <body>
   <h1>SimpleSwap DEX - Sepolia</h1>
-
-  <div>
-    <label>Token A address:
-      <input type="text" id="tokenA" readonly />
-    </label>
-    <label>Token B address:
-      <input type="text" id="tokenB" readonly />
-    </label>
-  </div>
 
   <div>
     <label>Swap direction:
@@ -36,6 +27,16 @@
       </select>
     </label>
 
+    <label>Token A address:
+      <input type="text" id="tokenA" readonly />
+    </label>
+
+    <label>Token B address:
+      <input type="text" id="tokenB" readonly />
+    </label>
+  </div>
+
+  <div>
     <label>Amount In:
       <input type="number" id="amountIn" min="0" step="any" placeholder="Amount to swap" />
     </label>
@@ -59,6 +60,7 @@
   </div>
 
   <script>
+    // === ✅ TU CONFIGURACIÓN DE CONTRATOS EN SEPOLIA ===
     const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc";
     const TOKEN_A_ADDRESS = "0x694C824819eF1f34EE04f591d1f2a2DABB89590E";
     const TOKEN_B_ADDRESS = "0x0f1b9B2B99F58Fd9cf0Adf729863844812F2401C";
@@ -95,11 +97,11 @@
         tokenAContract = new ethers.Contract(TOKEN_A_ADDRESS, erc20Abi, signer);
         tokenBContract = new ethers.Contract(TOKEN_B_ADDRESS, erc20Abi, signer);
 
-        document.getElementById("status").innerText = "Wallet connected!";
+        document.getElementById("status").innerText = "✅ Wallet connected!";
         document.getElementById("swapBtn").disabled = false;
       } catch (error) {
         console.error(error);
-        document.getElementById("status").innerText = "Failed to connect wallet.";
+        document.getElementById("status").innerText = "❌ Failed to connect wallet.";
       }
     }
 
@@ -109,45 +111,24 @@
         const amountOutMinInput = document.getElementById("amountOutMin").value;
         const deadlineInput = document.getElementById("deadline").value;
         const recipient = document.getElementById("recipient").value;
-        const swapDirection = document.getElementById("swapDirection").value;
+        const direction = document.getElementById("swapDirection").value;
 
         if (!amountInInput || !amountOutMinInput || !deadlineInput || !recipient) {
           alert("Please fill all fields.");
           return;
         }
 
-        const amountInRaw = parseFloat(amountInInput);
-        const amountOutMinRaw = parseFloat(amountOutMinInput);
+        const amountIn = ethers.utils.parseUnits(amountInInput, 18);
+        const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, 18);
         const deadline = Number(deadlineInput);
 
-        // Determine token contracts based on direction
-        let tokenInContract, tokenOutContract;
-        let tokenInAddress, tokenOutAddress;
+        const [tokenIn, tokenOut, tokenInContract] = direction === "AtoB"
+          ? [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS, tokenAContract]
+          : [TOKEN_B_ADDRESS, TOKEN_A_ADDRESS, tokenBContract];
 
-        if (swapDirection === "AtoB") {
-          tokenInContract = tokenAContract;
-          tokenOutContract = tokenBContract;
-          tokenInAddress = TOKEN_A_ADDRESS;
-          tokenOutAddress = TOKEN_B_ADDRESS;
-        } else {
-          tokenInContract = tokenBContract;
-          tokenOutContract = tokenAContract;
-          tokenInAddress = TOKEN_B_ADDRESS;
-          tokenOutAddress = TOKEN_A_ADDRESS;
-        }
-
-        // Get decimals for tokenIn and tokenOut
-        const decimalsIn = await tokenInContract.decimals();
-        const decimalsOut = await tokenOutContract.decimals();
-
-        // Convert input amounts using decimals
-        const amountIn = ethers.utils.parseUnits(amountInRaw.toString(), decimalsIn);
-        const amountOutMin = ethers.utils.parseUnits(amountOutMinRaw.toString(), decimalsOut);
-
-        // Check allowance and approve if needed
         const allowance = await tokenInContract.allowance(await signer.getAddress(), SIMPLE_SWAP_ADDRESS);
         if (allowance.lt(amountIn)) {
-          document.getElementById("status").innerText = "Approving token for swap...";
+          document.getElementById("status").innerText = "Approving token...";
           const approveTx = await tokenInContract.approve(SIMPLE_SWAP_ADDRESS, amountIn);
           await approveTx.wait();
         }
@@ -156,29 +137,18 @@
         const tx = await simpleSwapContract.swapExactTokensForTokens(
           amountIn,
           amountOutMin,
-          [tokenInAddress, tokenOutAddress],
+          [tokenIn, tokenOut],
           recipient,
           deadline
         );
         await tx.wait();
-        document.getElementById("status").innerText = "Swap completed successfully!";
+
+        document.getElementById("status").innerText = "✅ Swap completed successfully!";
       } catch (error) {
         console.error(error);
-        document.getElementById("status").innerText = "Swap failed: " + (error.data?.message || error.message);
+        document.getElementById("status").innerText = "❌ Swap failed: " + (error.data?.message || error.message);
       }
     }
-
-    // Update the placeholder of "Amount In" input when swap direction changes
-    document.getElementById("swapDirection").addEventListener("change", () => {
-      const dir = document.getElementById("swapDirection").value;
-      if (dir === "AtoB") {
-        document.getElementById("amountIn").placeholder = "Amount of Token A to swap";
-        document.getElementById("amountOutMin").placeholder = "Minimum amount of Token B to receive";
-      } else {
-        document.getElementById("amountIn").placeholder = "Amount of Token B to swap";
-        document.getElementById("amountOutMin").placeholder = "Minimum amount of Token A to receive";
-      }
-    });
 
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
