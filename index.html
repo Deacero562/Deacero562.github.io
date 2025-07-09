@@ -8,7 +8,7 @@
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
     label { display: block; margin-top: 1rem; }
-    input[type=text], input[type=number] { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    input[type=text], input[type=number], select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
     button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
     #status { margin-top: 1rem; font-weight: bold; }
   </style>
@@ -25,7 +25,7 @@
     </label>
   </div>
 
-  <!-- Add Liquidity -->
+  <!-- Sección para agregar liquidez -->
   <h2>Add Liquidity</h2>
   <div>
     <label>Amount Token A:
@@ -34,13 +34,10 @@
     <label>Amount Token B:
       <input type="number" id="addAmountB" min="0" step="any" placeholder="Amount of Token B to add" />
     </label>
-    <label style="display:none;">Deadline (unix timestamp):
-      <input type="number" id="addDeadline" readonly />
-    </label>
     <button id="addLiquidityBtn" disabled>Add Liquidity</button>
   </div>
 
-  <!-- Swap Tokens -->
+  <!-- Sección para swap -->
   <h2>Swap Tokens</h2>
   <div>
     <label>From Token:
@@ -62,17 +59,14 @@
       <input type="text" id="swapRecipient" placeholder="Address to receive tokens" />
     </label>
 
-    <label style="display:none;">Deadline (unix timestamp):
-      <input type="number" id="swapDeadline" readonly />
-    </label>
-
     <button id="connectBtn">Connect Wallet</button>
     <button id="swapBtn" disabled>Swap Tokens</button>
+
     <div id="status"></div>
   </div>
 
   <script>
-    // === SET HERE YOUR DEPLOYED CONTRACTS ===
+    // === Direcciones de contratos ===
     const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc";
     const TOKEN_A_ADDRESS = "0x694C824819eF1f34EE04f591d1f2a2DABB89590E";
     const TOKEN_B_ADDRESS = "0x0f1b9B2B99F58Fd9cf0Adf729863844812F2401C";
@@ -80,6 +74,7 @@
     document.getElementById("tokenA").value = TOKEN_A_ADDRESS;
     document.getElementById("tokenB").value = TOKEN_B_ADDRESS;
 
+    // ABI mínimos para ERC20 y SimpleSwap
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
       "function allowance(address owner, address spender) external view returns (uint256)",
@@ -89,8 +84,7 @@
 
     const simpleSwapAbi = [
       "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
-      "function addLiquidity(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 liquidity)",
-      "function getPrice(address tokenA, address tokenB) external view returns (uint256)"
+      "function addLiquidity(uint256 amountA, uint256 amountB, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256 liquidity)"
     ];
 
     let provider, signer;
@@ -138,17 +132,19 @@
           return;
         }
 
-        const decimalsA = 18; // si tus tokens tienen otros decimales, cámbialo acá
+        const decimalsA = 18; // Ajustar si tus tokens tienen otros decimales
         const decimalsB = 18;
 
         const amountA = ethers.utils.parseUnits(amountAInput, decimalsA);
         const amountB = ethers.utils.parseUnits(amountBInput, decimalsB);
 
-        const amountAMin = amountA.mul(95).div(100); // 5% slippage aprox
+        // Estimamos mínimo aceptable con 5% slippage
+        const amountAMin = amountA.mul(95).div(100);
         const amountBMin = amountB.mul(95).div(100);
 
+        // Deadline 5 minutos en el futuro
         const currentTimestamp = Math.floor(Date.now() / 1000);
-        const deadline = currentTimestamp + 300; // 5 minutos en el futuro
+        const deadline = currentTimestamp + 300;
 
         await approveIfNeeded(tokenAContract, amountA);
         await approveIfNeeded(tokenBContract, amountB);
@@ -182,7 +178,7 @@
           return;
         }
 
-        const decimals = 18; // si tus tokens tienen otros decimales, cámbialo acá
+        const decimals = 18; // Ajustar si tus tokens tienen otros decimales
         const amountIn = ethers.utils.parseUnits(amountInInput, decimals);
         const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, decimals);
 
@@ -191,7 +187,7 @@
           : [TOKEN_B_ADDRESS, TOKEN_A_ADDRESS];
 
         const currentTimestamp = Math.floor(Date.now() / 1000);
-        const deadline = currentTimestamp + 300; // 5 minutos en el futuro
+        const deadline = currentTimestamp + 300; // 5 minutos
 
         const tokenContract = fromToken === "A" ? tokenAContract : tokenBContract;
 
