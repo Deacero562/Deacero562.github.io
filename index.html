@@ -1,111 +1,135 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Conectar Wallet y Agregar Liquidez</title>
-<script src="https://cdn.ethers.io/lib/ethers-5.6.umd.min.js" type="application/javascript"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SimpleSwap DEX</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
+    label { display: block; margin-top: 1rem; }
+    input, select { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    button { margin-top: 1rem; padding: 0.75rem 1.5rem; }
+    #status { margin-top: 1rem; font-weight: bold; }
+  </style>
 </head>
 <body>
+  <h1>SimpleSwap DEX - Sepolia</h1>
 
-<button id="btnConnect">Conectar Wallet</button>
-<p id="status">No conectado</p>
+  <div>
+    <label>Swap Direction:
+      <select id="swapDirection">
+        <option value="AtoB">Token A → Token B</option>
+        <option value="BtoA">Token B → Token A</option>
+      </select>
+    </label>
 
-<hr />
+    <label>Amount In:
+      <input type="number" id="amountIn" min="0" step="any" placeholder="Amount to swap" />
+    </label>
 
-<h3>Agregar Liquidez</h3>
-<button id="btnAddLiquidity" disabled>Agregar Liquidez</button>
-<p id="result"></p>
+    <label>Minimum Amount Out:
+      <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount to receive" />
+    </label>
 
-<script>
-  const btnConnect = document.getElementById('btnConnect');
-  const btnAddLiquidity = document.getElementById('btnAddLiquidity');
-  const status = document.getElementById('status');
-  const result = document.getElementById('result');
+    <label>Recipient address:
+      <input type="text" id="recipient" placeholder="Address to receive tokens" />
+    </label>
 
-  let provider;
-  let signer;
-  let userAddress;
+    <button id="connectBtn">Connect Wallet</button>
+    <button id="swapBtn" disabled>Swap Tokens</button>
 
-  // Dirección del contrato SimpleUniswapRouter desplegado
-  const contractAddress = '0x344ec156133a57169cb50d8f2a67f9e9023698fc';
+    <div id="status"></div>
+  </div>
 
-  // ABI reducido para addLiquidity (modifica si tu contrato tiene más funciones o diferente ABI)
-  const contractABI = [
-    "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256,uint256,uint256)"
-  ];
+  <script>
+    const SIMPLE_SWAP_ADDRESS = "0x344ec156133A57169cb50d8f2A67f9e9023698fc";
+    const TOKEN_A_ADDRESS = "0x694C824819eF1f34EE04f591d1f2a2DABB89590E";
+    const TOKEN_B_ADDRESS = "0x0f1b9B2B99F58Fd9cf0Adf729863844812F2401C";
 
-  // Parámetros para addLiquidity: cámbialos según tu caso
-  const tokenA = '0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8';
-  const tokenB = '0x788839617211f1056Ef48C3B425A102E804A5A36';
+    const erc20Abi = [
+      "function approve(address spender, uint256 amount) external returns (bool)",
+      "function allowance(address owner, address spender) external view returns (uint256)",
+      "function decimals() view returns (uint8)",
+      "function balanceOf(address) view returns (uint256)"
+    ];
 
-  // Ejemplo cantidades (18 decimales)
-  const amountADesired = ethers.utils.parseUnits("10", 18); // 10 tokens A
-  const amountBDesired = ethers.utils.parseUnits("10", 18); // 10 tokens B
+    const simpleSwapAbi = [
+      "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)"
+    ];
 
-  // Slippage mínimo (ejemplo 99% de la cantidad deseada)
-  const amountAMin = ethers.utils.parseUnits("9.9", 18);
-  const amountBMin = ethers.utils.parseUnits("9.9", 18);
+    let provider, signer;
+    let simpleSwapContract, tokenAContract, tokenBContract;
 
-  // Deadline: ahora + 20 minutos
-  const deadline = Math.floor(Date.now() / 1000) + 1200;
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("MetaMask is required!");
+        return;
+      }
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
 
-  btnConnect.addEventListener('click', async () => {
-    if (!window.ethereum) {
-      alert('MetaMask no está instalado');
-      return;
+        simpleSwapContract = new ethers.Contract(SIMPLE_SWAP_ADDRESS, simpleSwapAbi, signer);
+        tokenAContract = new ethers.Contract(TOKEN_A_ADDRESS, erc20Abi, signer);
+        tokenBContract = new ethers.Contract(TOKEN_B_ADDRESS, erc20Abi, signer);
+
+        document.getElementById("status").innerText = "Wallet connected!";
+        document.getElementById("swapBtn").disabled = false;
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Failed to connect wallet.";
+      }
     }
-    try {
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-      provider = new ethers.providers.Web3Provider(window.ethereum);
-      signer = provider.getSigner();
-      userAddress = await signer.getAddress();
-      status.textContent = `Wallet conectada: ${userAddress}`;
-      btnConnect.disabled = true;
-      btnAddLiquidity.disabled = false;
-      console.log("Wallet conectada:", userAddress);
-    } catch (error) {
-      console.error('Error al conectar wallet:', error);
-      status.textContent = 'Error al conectar wallet';
+
+    async function swapTokens() {
+      try {
+        const amountInInput = document.getElementById("amountIn").value;
+        const amountOutMinInput = document.getElementById("amountOutMin").value;
+        const recipient = document.getElementById("recipient").value;
+        const direction = document.getElementById("swapDirection").value;
+
+        if (!amountInInput || !amountOutMinInput || !recipient) {
+          alert("Please fill all fields.");
+          return;
+        }
+
+        const amountIn = ethers.utils.parseUnits(amountInInput, 18);
+        const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, 18);
+        const deadline = Math.floor(Date.now() / 1000) + 300; // +5 min
+
+        const path = direction === "AtoB"
+          ? [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS]
+          : [TOKEN_B_ADDRESS, TOKEN_A_ADDRESS];
+
+        const inputToken = direction === "AtoB" ? tokenAContract : tokenBContract;
+
+        const allowance = await inputToken.allowance(await signer.getAddress(), SIMPLE_SWAP_ADDRESS);
+        if (allowance.lt(amountIn)) {
+          document.getElementById("status").innerText = "Approving token...";
+          const approveTx = await inputToken.approve(SIMPLE_SWAP_ADDRESS, amountIn);
+          await approveTx.wait();
+        }
+
+        document.getElementById("status").innerText = "Swapping tokens...";
+        const tx = await simpleSwapContract.swapExactTokensForTokens(
+          amountIn,
+          amountOutMin,
+          path,
+          recipient,
+          deadline
+        );
+        await tx.wait();
+        document.getElementById("status").innerText = "Swap completed successfully!";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Swap failed: " + (error.data?.message || error.message);
+      }
     }
-  });
 
-  btnAddLiquidity.addEventListener('click', async () => {
-    if (!signer) {
-      alert('Primero conecta tu wallet');
-      return;
-    }
-
-    try {
-      const contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-      // IMPORTANTE: Antes de llamar addLiquidity, debes asegurarte que tu wallet haya aprobado (approve) al contrato
-      // para gastar los tokens tokenA y tokenB. Si no, la transacción fallará con "allowance exceeded".
-      // Esa parte la debes hacer antes o añadirla aquí.
-
-      const tx = await contract.addLiquidity(
-        tokenA,
-        tokenB,
-        amountADesired,
-        amountBDesired,
-        amountAMin,
-        amountBMin,
-        userAddress,
-        deadline
-      );
-
-      result.textContent = 'Transacción enviada, esperando confirmación...';
-      console.log('Tx hash:', tx.hash);
-
-      const receipt = await tx.wait();
-      result.textContent = `Liquidez agregada! Tx hash: ${receipt.transactionHash}`;
-      console.log('Tx receipt:', receipt);
-    } catch (error) {
-      console.error('Error al agregar liquidez:', error);
-      result.textContent = 'Error al agregar liquidez: ' + (error.data?.message || error.message || error);
-    }
-  });
-</script>
-
+    document.getElementById("connectBtn").addEventListener("click", connectWallet);
+    document.getElementById("swapBtn").addEventListener("click", swapTokens);
+  </script>
 </body>
 </html>
