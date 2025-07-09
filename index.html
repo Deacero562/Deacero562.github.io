@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SimpleSwap DEX</title>
+  <title>SimpleSwap DEX - Checksum fixed</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
@@ -45,9 +45,17 @@
   </div>
 
   <script>
-    const SIMPLE_SWAP_ADDRESS = "0x344Ec156133A57169CB50D8F2A67F9E9023698Fc";
-    const TOKEN_A_ADDRESS = "0xa37D029DE7c770ef8DE20fB1225167f84ae9DeC8";
-    const TOKEN_B_ADDRESS = "0x788839617211f1056Ef48C3B425A102E804A5A36";
+    const { ethers } = window;
+
+    // Raw lowercase addresses (no checksum)
+    const SIMPLE_SWAP_ADDRESS_RAW = "0x344ec156133a57169cb50d8f2a67f9e9023698fc";
+    const TOKEN_A_ADDRESS_RAW = "0xa37d029de7c770ef8de20fb1225167f84ae9dec8";
+    const TOKEN_B_ADDRESS_RAW = "0x788839617211f1056ef48c3b425a102e804a5a36";
+
+    // Force checksum addresses
+    const SIMPLE_SWAP_ADDRESS = ethers.utils.getAddress(SIMPLE_SWAP_ADDRESS_RAW);
+    const TOKEN_A_ADDRESS = ethers.utils.getAddress(TOKEN_A_ADDRESS_RAW);
+    const TOKEN_B_ADDRESS = ethers.utils.getAddress(TOKEN_B_ADDRESS_RAW);
 
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
@@ -96,8 +104,6 @@
           return;
         }
         const amount = ethers.utils.parseUnits(amountInInput, 18);
-
-        const address = await signer.getAddress();
 
         document.getElementById("status").innerText = "Approving Token A...";
         let tx = await tokenAContract.approve(SIMPLE_SWAP_ADDRESS, amount);
