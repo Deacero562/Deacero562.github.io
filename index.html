@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SimpleSwap DEX - Checksum fixed + Get Price</title>
+  <title>SimpleSwap DEX - Sepolia</title>
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 2rem auto; padding: 1rem; }
@@ -41,6 +41,7 @@
     <button id="addLiquidityBtn" disabled>Add Liquidity</button>
     <button id="swapBtn" disabled>Swap Tokens</button>
     <button id="getPriceBtn" disabled>Get Price</button>
+    <button id="faucetBtn" disabled>Get Test Tokens (Faucet)</button>
 
     <div id="status"></div>
     <div id="priceDisplay" style="margin-top: 1rem; font-weight: bold;"></div>
@@ -61,7 +62,8 @@
       "function approve(address spender, uint256 amount) external returns (bool)",
       "function allowance(address owner, address spender) external view returns (uint256)",
       "function decimals() view returns (uint8)",
-      "function balanceOf(address) view returns (uint256)"
+      "function balanceOf(address) view returns (uint256)",
+      "function mint(address to, uint256 amount) external"
     ];
 
     const simpleSwapAbi = [
@@ -92,6 +94,7 @@
         document.getElementById("addLiquidityBtn").disabled = false;
         document.getElementById("swapBtn").disabled = false;
         document.getElementById("getPriceBtn").disabled = false;
+        document.getElementById("faucetBtn").disabled = false;
       } catch (error) {
         console.error(error);
         document.getElementById("status").innerText = "Failed to connect wallet.";
@@ -131,8 +134,7 @@
           return;
         }
         const amountDesired = ethers.utils.parseUnits(amountInInput, 18);
-
-        const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes from now
+        const deadline = Math.floor(Date.now() / 1000) + 300;
 
         document.getElementById("status").innerText = "Adding liquidity...";
 
@@ -141,8 +143,8 @@
           TOKEN_B_ADDRESS,
           amountDesired,
           amountDesired,
-          amountDesired.mul(99).div(100), // amountAMin = 99% of amountDesired
-          amountDesired.mul(99).div(100), // amountBMin = 99% of amountDesired
+          amountDesired.mul(99).div(100),
+          amountDesired.mul(99).div(100),
           recipient,
           deadline
         );
@@ -169,7 +171,7 @@
 
         const amountIn = ethers.utils.parseUnits(amountInInput, 18);
         const amountOutMin = ethers.utils.parseUnits(amountOutMinInput, 18);
-        const deadline = Math.floor(Date.now() / 1000) + 300; // +5 min
+        const deadline = Math.floor(Date.now() / 1000) + 300;
 
         const path = direction === "AtoB"
           ? [TOKEN_A_ADDRESS, TOKEN_B_ADDRESS]
@@ -193,6 +195,7 @@
           deadline
         );
         await tx.wait();
+
         document.getElementById("status").innerText = "Swap completed successfully!";
       } catch (error) {
         console.error(error);
@@ -208,9 +211,6 @@
 
         document.getElementById("status").innerText = "Fetching price...";
         const priceRaw = await simpleSwapContract.getPrice(tokenIn, tokenOut);
-        // priceRaw is uint256 with 18 decimals
-
-        // Convert price to human-readable number (floating point)
         const priceFormatted = ethers.utils.formatUnits(priceRaw, 18);
 
         document.getElementById("priceDisplay").innerText = `Price: 1 ${direction === "AtoB" ? "Token A" : "Token B"} = ${priceFormatted} ${direction === "AtoB" ? "Token B" : "Token A"}`;
@@ -221,11 +221,32 @@
       }
     }
 
+    async function mintTokens() {
+      try {
+        const userAddress = await signer.getAddress();
+        const amount = ethers.utils.parseUnits("1000", 18);
+
+        document.getElementById("status").innerText = "Minting Token A...";
+        let tx = await tokenAContract.mint(userAddress, amount);
+        await tx.wait();
+
+        document.getElementById("status").innerText = "Minting Token B...";
+        tx = await tokenBContract.mint(userAddress, amount);
+        await tx.wait();
+
+        document.getElementById("status").innerText = "Test tokens received!";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Faucet failed: " + (error.data?.message || error.message);
+      }
+    }
+
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
     document.getElementById("approveBtn").addEventListener("click", approveTokens);
     document.getElementById("addLiquidityBtn").addEventListener("click", addLiquidity);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
     document.getElementById("getPriceBtn").addEventListener("click", getPrice);
+    document.getElementById("faucetBtn").addEventListener("click", mintTokens);
   </script>
 </body>
 </html>
