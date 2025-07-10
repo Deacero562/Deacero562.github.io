@@ -12,6 +12,7 @@ Este proyecto es una interfaz web simple para interactuar con el contrato inteli
 - ✅ Intercambiar Token A por B y viceversa
 - ✅ Obtener el precio de un token respecto al otro
 - ✅ Visualización de estados y errores
+- ✅ Mintear tokens A y B en forma de faucet.
 
 ---
 
