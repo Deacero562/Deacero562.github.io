@@ -8,7 +8,6 @@ Este proyecto es una interfaz web simple para interactuar con el contrato inteli
 
 - ✅ Conexión con MetaMask
 - ✅ Aprobación de Token A y B para el contrato
-- ✅ Agregar liquidez al par Token A / Token B
 - ✅ Intercambiar Token A por B y viceversa
 - ✅ Obtener el precio de un token respecto al otro
 - ✅ Visualización de estados y errores
