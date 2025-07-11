@@ -25,11 +25,11 @@
     </label>
 
     <label>Amount In:
-      <input type="number" id="amountIn" min="0" step="any" placeholder="Amount to swap or add liquidity" />
+      <input type="number" id="amountIn" min="0" step="any" placeholder="Amount to swap" />
     </label>
 
-    <label>Minimum Amount Out (only for swap):
-      <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount to receive (swap)" />
+    <label>Minimum Amount Out:
+      <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount to receive" />
     </label>
 
     <label>Recipient address:
@@ -37,11 +37,10 @@
     </label>
 
     <button id="connectBtn">Connect Wallet</button>
-    <button id="approveBtn" disabled>Approve Tokens</button>
-    <button id="addLiquidityBtn" disabled>Add Liquidity</button>
+    <button id="faucetBtn" disabled>Get Test Tokens (Faucet)</button>    
     <button id="swapBtn" disabled>Swap Tokens</button>
     <button id="getPriceBtn" disabled>Get Price</button>
-    <button id="faucetBtn" disabled>Get Test Tokens (Faucet)</button>
+    <button id="approveBtn" disabled>Approve Tokens</button>
 
     <div id="status"></div>
     <div id="priceDisplay" style="margin-top: 1rem; font-weight: bold;"></div>
@@ -50,13 +49,9 @@
   <script>
     const { ethers } = window;
 
-    const SIMPLE_SWAP_ADDRESS_RAW = "0x344ec156133a57169cb50d8f2a67f9e9023698fc";
-    const TOKEN_A_ADDRESS_RAW = "0xa37d029de7c770ef8de20fb1225167f84ae9dec8";
-    const TOKEN_B_ADDRESS_RAW = "0x788839617211f1056ef48c3b425a102e804a5a36";
-
-    const SIMPLE_SWAP_ADDRESS = ethers.utils.getAddress(SIMPLE_SWAP_ADDRESS_RAW);
-    const TOKEN_A_ADDRESS = ethers.utils.getAddress(TOKEN_A_ADDRESS_RAW);
-    const TOKEN_B_ADDRESS = ethers.utils.getAddress(TOKEN_B_ADDRESS_RAW);
+    const SIMPLE_SWAP_ADDRESS = "0x344ec156133a57169cb50d8f2a67f9e9023698fc";
+    const TOKEN_A_ADDRESS = "0xa37d029de7c770ef8de20fb1225167f84ae9dec8";
+    const TOKEN_B_ADDRESS = "0x788839617211f1056ef48c3b425a102e804a5a36";
 
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
@@ -67,7 +62,6 @@
     ];
 
     const simpleSwapAbi = [
-      "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256, uint256, uint256)",
       "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
       "function getPrice(address tokenA, address tokenB) external view returns (uint256)"
     ];
@@ -91,7 +85,6 @@
 
         document.getElementById("status").innerText = "Wallet connected!";
         document.getElementById("approveBtn").disabled = false;
-        document.getElementById("addLiquidityBtn").disabled = false;
         document.getElementById("swapBtn").disabled = false;
         document.getElementById("getPriceBtn").disabled = false;
         document.getElementById("faucetBtn").disabled = false;
@@ -122,38 +115,6 @@
       } catch (error) {
         console.error(error);
         document.getElementById("status").innerText = "Approval failed: " + (error.data?.message || error.message);
-      }
-    }
-
-    async function addLiquidity() {
-      try {
-        const amountInInput = document.getElementById("amountIn").value;
-        const recipient = document.getElementById("recipient").value;
-        if (!amountInInput || !recipient) {
-          alert("Please fill amount and recipient.");
-          return;
-        }
-        const amountDesired = ethers.utils.parseUnits(amountInInput, 18);
-        const deadline = Math.floor(Date.now() / 1000) + 300;
-
-        document.getElementById("status").innerText = "Adding liquidity...";
-
-        const tx = await simpleSwapContract.addLiquidity(
-          TOKEN_A_ADDRESS,
-          TOKEN_B_ADDRESS,
-          amountDesired,
-          amountDesired,
-          amountDesired.mul(99).div(100),
-          amountDesired.mul(99).div(100),
-          recipient,
-          deadline
-        );
-        await tx.wait();
-
-        document.getElementById("status").innerText = "Liquidity added successfully!";
-      } catch (error) {
-        console.error(error);
-        document.getElementById("status").innerText = "Add liquidity failed: " + (error.data?.message || error.message);
       }
     }
 
@@ -243,7 +204,6 @@
 
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
     document.getElementById("approveBtn").addEventListener("click", approveTokens);
-    document.getElementById("addLiquidityBtn").addEventListener("click", addLiquidity);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
     document.getElementById("getPriceBtn").addEventListener("click", getPrice);
     document.getElementById("faucetBtn").addEventListener("click", mintTokens);
