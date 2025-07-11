@@ -32,17 +32,23 @@
       <input type="number" id="amountOutMin" min="0" step="any" placeholder="Minimum amount to receive (swap)" />
     </label>
 
+    <label>Liquidity Amount to Remove:
+      <input type="number" id="liquidityAmount" min="0" step="any" placeholder="LP tokens to burn" />
+    </label>
+
     <label>Recipient address:
       <input type="text" id="recipient" placeholder="Address to receive tokens" />
     </label>
 
     <button id="connectBtn">Connect Wallet</button>
+    <button id="faucetBtn" disabled>Get Test Tokens (Faucet)</button>    
+    <button id="getPriceBtn" disabled>Get Price</button>
+    <button id="swapBtn" disabled>Swap Tokens</button>    
     <button id="approveBtn" disabled>Approve Tokens</button>
     <button id="addLiquidityBtn" disabled>Add Liquidity</button>
-    <button id="swapBtn" disabled>Swap Tokens</button>
-    <button id="getPriceBtn" disabled>Get Price</button>
-    <button id="faucetBtn" disabled>Get Test Tokens (Faucet)</button>
-
+    <button id="removeLiquidityBtn" disabled>Remove Liquidity</button>
+    
+    
     <div id="status"></div>
     <div id="priceDisplay" style="margin-top: 1rem; font-weight: bold;"></div>
   </div>
@@ -50,13 +56,9 @@
   <script>
     const { ethers } = window;
 
-    const SIMPLE_SWAP_ADDRESS_RAW = "0x344ec156133a57169cb50d8f2a67f9e9023698fc";
-    const TOKEN_A_ADDRESS_RAW = "0xa37d029de7c770ef8de20fb1225167f84ae9dec8";
-    const TOKEN_B_ADDRESS_RAW = "0x788839617211f1056ef48c3b425a102e804a5a36";
-
-    const SIMPLE_SWAP_ADDRESS = ethers.utils.getAddress(SIMPLE_SWAP_ADDRESS_RAW);
-    const TOKEN_A_ADDRESS = ethers.utils.getAddress(TOKEN_A_ADDRESS_RAW);
-    const TOKEN_B_ADDRESS = ethers.utils.getAddress(TOKEN_B_ADDRESS_RAW);
+    const SIMPLE_SWAP_ADDRESS = ethers.utils.getAddress("0x344ec156133a57169cb50d8f2a67f9e9023698fc");
+    const TOKEN_A_ADDRESS = ethers.utils.getAddress("0xa37d029de7c770ef8de20fb1225167f84ae9dec8");
+    const TOKEN_B_ADDRESS = ethers.utils.getAddress("0x788839617211f1056ef48c3b425a102e804a5a36");
 
     const erc20Abi = [
       "function approve(address spender, uint256 amount) external returns (bool)",
@@ -68,6 +70,7 @@
 
     const simpleSwapAbi = [
       "function addLiquidity(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256, uint256, uint256)",
+      "function removeLiquidity(address tokenA, address tokenB, uint256 liquidity, uint256 amountAMin, uint256 amountBMin, address to, uint256 deadline) external returns (uint256, uint256)",
       "function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
       "function getPrice(address tokenA, address tokenB) external view returns (uint256)"
     ];
@@ -93,6 +96,7 @@
         document.getElementById("approveBtn").disabled = false;
         document.getElementById("addLiquidityBtn").disabled = false;
         document.getElementById("swapBtn").disabled = false;
+        document.getElementById("removeLiquidityBtn").disabled = false;
         document.getElementById("getPriceBtn").disabled = false;
         document.getElementById("faucetBtn").disabled = false;
       } catch (error) {
@@ -154,6 +158,39 @@
       } catch (error) {
         console.error(error);
         document.getElementById("status").innerText = "Add liquidity failed: " + (error.data?.message || error.message);
+      }
+    }
+
+    async function removeLiquidity() {
+      try {
+        const liquidityInput = document.getElementById("liquidityAmount").value;
+        const recipient = document.getElementById("recipient").value;
+        if (!liquidityInput || !recipient) {
+          alert("Please enter liquidity amount and recipient.");
+          return;
+        }
+
+        const liquidity = ethers.utils.parseUnits(liquidityInput, 18);
+        const amountAMin = 0;
+        const amountBMin = 0;
+        const deadline = Math.floor(Date.now() / 1000) + 300;
+
+        document.getElementById("status").innerText = "Removing liquidity...";
+        const tx = await simpleSwapContract.removeLiquidity(
+          TOKEN_A_ADDRESS,
+          TOKEN_B_ADDRESS,
+          liquidity,
+          amountAMin,
+          amountBMin,
+          recipient,
+          deadline
+        );
+        await tx.wait();
+
+        document.getElementById("status").innerText = "Liquidity removed successfully!";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").innerText = "Remove failed: " + (error.data?.message || error.message);
       }
     }
 
@@ -244,6 +281,7 @@
     document.getElementById("connectBtn").addEventListener("click", connectWallet);
     document.getElementById("approveBtn").addEventListener("click", approveTokens);
     document.getElementById("addLiquidityBtn").addEventListener("click", addLiquidity);
+    document.getElementById("removeLiquidityBtn").addEventListener("click", removeLiquidity);
     document.getElementById("swapBtn").addEventListener("click", swapTokens);
     document.getElementById("getPriceBtn").addEventListener("click", getPrice);
     document.getElementById("faucetBtn").addEventListener("click", mintTokens);
