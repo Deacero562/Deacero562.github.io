@@ -213,7 +213,7 @@
         const priceRaw = await simpleSwapContract.getPrice(tokenIn, tokenOut);
         const priceFormatted = ethers.utils.formatUnits(priceRaw, 18);
 
-        document.getElementById("priceDisplay").innerText = Price: 1 ${direction === "AtoB" ? "Token A" : "Token B"} = ${priceFormatted} ${direction === "AtoB" ? "Token B" : "Token A"};
+        document.getElementById("priceDisplay").innerText = `Price: 1 ${direction === "AtoB" ? "Token A" : "Token B"} = ${priceFormatted} ${direction === "AtoB" ? "Token B" : "Token A"}`;
         document.getElementById("status").innerText = "";
       } catch (error) {
         console.error(error);
